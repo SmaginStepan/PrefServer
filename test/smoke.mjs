@@ -127,6 +127,7 @@ check(true, "kicked player notified");
 
 // host leaves -> room closes and disappears from the lobby
 host.send({ type: "leave" });
+await host.wait((m) => m.type === "left");
 bob.send({ type: "list_rooms" });
 const after = await bob.wait((m) => m.type === "rooms");
 check(!after.rooms.some((r) => r.id === roomId), "room closed after host left");

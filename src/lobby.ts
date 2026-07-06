@@ -281,6 +281,9 @@ export function handleMessage(session: Session, msg: ClientMsg) {
 
     case "leave": {
       leaveRoom(session, false);
+      // ack after the room state is settled, so clients (and tests) can
+      // sequence follow-up actions deterministically
+      send(session, { type: "left" });
       return;
     }
 
