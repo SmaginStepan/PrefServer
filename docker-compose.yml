@@ -1,0 +1,9 @@
+services:
+  pref:
+    build: .
+    container_name: pref_server
+    environment:
+      PORT: "8090"
+    ports:
+      - "127.0.0.1:8090:8090"
+    restart: unless-stopped
