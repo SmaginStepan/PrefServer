@@ -154,6 +154,19 @@ host.send({ type: "start" });
 await host.wait((m) => m.type === "started");
 check(true, "resumed game started");
 
+// Rate-limit: flood relay messages from a fresh connection and expect rate_limited
+const flooder = new Client("Flooder", "flooder-0000");
+await flooder.hello();
+flooder.send({ type: "create_room", name: "Flood room", rules: {}, maxSeats: 3 });
+await flooder.wait((m) => m.type === "room_created");
+// Send 65 relay messages in one burst; limit is 60/s — message 61+ should be rejected
+for (let i = 0; i < 65; i++) {
+  flooder.send({ type: "send", toSeat: 1, data: { i } });
+}
+const rl = await flooder.wait((m) => m.type === "error" && m.code === "rate_limited", 5000);
+check(rl?.code === "rate_limited", "relay rate limiting fires at flood speed");
+flooder.close();
+
 host.close();
 alice2.close();
 bob.close();

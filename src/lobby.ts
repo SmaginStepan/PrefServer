@@ -9,6 +9,10 @@ export interface Session {
   name?: string;
   roomId?: string;
   seat?: number;
+  // Rate limiting
+  roomCreations: number[];   // timestamps of recent create/reopen calls
+  msgCount: number;          // relay messages sent in current window
+  msgWindowStart: number;    // start of current rate-limit window (ms)
 }
 
 interface Seat {
@@ -27,9 +31,22 @@ interface Room {
   phase: "open" | "playing";
   seats: (Seat | null)[];
   createdAt: number;
+  lastActivityAt: number;
 }
 
 const MAX_ROOMS = 200;
+
+// Room creation: max 5 per session per hour
+const ROOM_CREATION_LIMIT = 5;
+const ROOM_CREATION_WINDOW_MS = 60 * 60 * 1000;
+
+// Relay message rate: max 60 per second per session
+const MSG_RATE_LIMIT = 60;
+const MSG_RATE_WINDOW_MS = 1_000;
+
+// Stale room thresholds
+const OPEN_ROOM_IDLE_MS = 2 * 60 * 60 * 1000;    // 2 hours
+const PLAYING_ROOM_IDLE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 const rooms = new Map<string, Room>();
 const byPlayerId = new Map<string, Session>();
@@ -112,21 +129,38 @@ function leaveRoom(session: Session, disconnected: boolean) {
   if (!room || seatNo === undefined) return;
 
   if (seatNo === 0) {
-    // Host gone: the room cannot continue (the host runs the game). The host
-    // can reopen the room later to resume.
     closeRoom(room, disconnected ? "host_disconnected" : "host_left");
     return;
   }
   const seat = room.seats[seatNo];
   if (seat) {
     if (room.phase === "playing") {
-      // keep the seat reserved so the player can rejoin
       seat.connected = false;
     } else {
       room.seats[seatNo] = null;
     }
   }
   broadcastRoom(room);
+}
+
+function checkRoomCreationRate(session: Session): boolean {
+  const now = Date.now();
+  session.roomCreations = session.roomCreations.filter(
+    (t) => now - t < ROOM_CREATION_WINDOW_MS
+  );
+  if (session.roomCreations.length >= ROOM_CREATION_LIMIT) return false;
+  session.roomCreations.push(now);
+  return true;
+}
+
+function checkMsgRate(session: Session): boolean {
+  const now = Date.now();
+  if (now - session.msgWindowStart >= MSG_RATE_WINDOW_MS) {
+    session.msgCount = 0;
+    session.msgWindowStart = now;
+  }
+  session.msgCount++;
+  return session.msgCount <= MSG_RATE_LIMIT;
 }
 
 export function onDisconnect(session: Session) {
@@ -139,10 +173,8 @@ export function handleMessage(session: Session, msg: ClientMsg) {
   if (msg.type === "hello") {
     const existing = byPlayerId.get(msg.playerId);
     if (existing && existing !== session) {
-      // a newer connection for the same player replaces the old one
       error(existing, "replaced", "Connected from another device");
       existing.ws.close();
-      // inherit the room binding so a quick reconnect keeps the seat
       session.roomId = existing.roomId;
       session.seat = existing.seat;
       existing.roomId = undefined;
@@ -185,6 +217,10 @@ export function handleMessage(session: Session, msg: ClientMsg) {
         error(session, "server_full", "Too many rooms");
         return;
       }
+      if (!checkRoomCreationRate(session)) {
+        error(session, "rate_limited", "Too many rooms created recently, try again later");
+        return;
+      }
       let id: string;
       let seats: (Seat | null)[];
       if (msg.type === "reopen_room") {
@@ -208,13 +244,13 @@ export function handleMessage(session: Session, msg: ClientMsg) {
         id = newRoomId();
         seats = new Array(msg.maxSeats).fill(null);
       }
-      // seat 0 is always the (current) host
       seats[0] = {
         playerId: session.playerId,
         name: session.name,
         kind: "human",
         connected: true,
       };
+      const now = Date.now();
       const room: Room = {
         id,
         name: msg.name,
@@ -223,7 +259,8 @@ export function handleMessage(session: Session, msg: ClientMsg) {
         passwordHash: msg.password ? hash(msg.password) : undefined,
         phase: "open",
         seats,
-        createdAt: Date.now(),
+        createdAt: now,
+        lastActivityAt: now,
       };
       rooms.set(id, room);
       session.roomId = id;
@@ -243,7 +280,6 @@ export function handleMessage(session: Session, msg: ClientMsg) {
         error(session, "no_room", "Room not found");
         return;
       }
-      // reclaiming a reserved seat skips the password (the player was invited)
       let seatNo = room.seats.findIndex(
         (s) => s?.kind === "human" && s.playerId === session.playerId
       );
@@ -272,6 +308,7 @@ export function handleMessage(session: Session, msg: ClientMsg) {
         seat.connected = true;
         seat.name = session.name;
       }
+      room.lastActivityAt = Date.now();
       session.roomId = room.id;
       session.seat = seatNo;
       send(session, { type: "joined", roomId: room.id, seat: seatNo });
@@ -281,8 +318,6 @@ export function handleMessage(session: Session, msg: ClientMsg) {
 
     case "leave": {
       leaveRoom(session, false);
-      // ack after the room state is settled, so clients (and tests) can
-      // sequence follow-up actions deterministically
       send(session, { type: "left" });
       return;
     }
@@ -311,6 +346,7 @@ export function handleMessage(session: Session, msg: ClientMsg) {
         }
       }
       room.seats[msg.seat] = null;
+      room.lastActivityAt = Date.now();
       broadcastRoom(room);
       return;
     }
@@ -346,6 +382,7 @@ export function handleMessage(session: Session, msg: ClientMsg) {
         kind: "bot",
         connected: true,
       };
+      room.lastActivityAt = Date.now();
       broadcastRoom(room);
       return;
     }
@@ -362,6 +399,7 @@ export function handleMessage(session: Session, msg: ClientMsg) {
         return;
       }
       room.phase = "playing";
+      room.lastActivityAt = Date.now();
       broadcastRoom(room);
       for (const seat of room.seats) {
         if (seat?.playerId) {
@@ -373,13 +411,17 @@ export function handleMessage(session: Session, msg: ClientMsg) {
     }
 
     case "send": {
+      if (!checkMsgRate(session)) {
+        error(session, "rate_limited", "Message rate exceeded, slow down");
+        return;
+      }
       const room = session.roomId ? rooms.get(session.roomId) : undefined;
       if (!room) {
         error(session, "no_room", "Not in a room");
         return;
       }
+      room.lastActivityAt = Date.now();
       if (session.seat === 0) {
-        // host -> guest
         if (msg.toSeat === undefined || msg.toSeat >= room.maxSeats) {
           error(session, "bad_seat", "toSeat required");
           return;
@@ -394,7 +436,6 @@ export function handleMessage(session: Session, msg: ClientMsg) {
           send(target, { type: "host_msg", data: msg.data });
         return;
       }
-      // guest -> host
       const host = hostSession(room);
       if (host)
         send(host, { type: "player_msg", fromSeat: session.seat, data: msg.data });
@@ -405,4 +446,34 @@ export function handleMessage(session: Session, msg: ClientMsg) {
 
 export function stats() {
   return { rooms: rooms.size, players: byPlayerId.size };
+}
+
+export function cleanupStaleRooms(): number {
+  const now = Date.now();
+  const toClose: { room: Room; reason: string }[] = [];
+
+  for (const room of rooms.values()) {
+    const idle = now - room.lastActivityAt;
+    if (room.phase === "open" && idle > OPEN_ROOM_IDLE_MS) {
+      toClose.push({ room, reason: "idle_timeout" });
+    } else if (room.phase === "playing" && idle > PLAYING_ROOM_IDLE_MS) {
+      toClose.push({ room, reason: "idle_timeout" });
+    } else if (room.phase === "playing") {
+      const hasConnectedHuman = room.seats.some(
+        (s) => s?.kind === "human" && s.connected
+      );
+      if (!hasConnectedHuman) {
+        toClose.push({ room, reason: "abandoned" });
+      }
+    }
+  }
+
+  for (const { room, reason } of toClose) {
+    if (rooms.has(room.id)) {
+      console.log(`[cleanup] closing stale room ${room.id} (${reason})`);
+      closeRoom(room, reason);
+    }
+  }
+
+  return toClose.length;
 }
