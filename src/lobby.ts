@@ -20,6 +20,19 @@ interface Seat {
   name: string;
   kind: "human" | "bot";
   connected: boolean;
+  /** pending removal after a transient disconnect */
+  graceTimer?: NodeJS.Timeout;
+}
+
+// How long a dropped connection may reclaim its place before it is given up.
+const GUEST_GRACE_MS = 90_000;
+const HOST_GRACE_MS = 60_000;
+
+function clearGrace(seat: Seat | null | undefined) {
+  if (seat?.graceTimer) {
+    clearTimeout(seat.graceTimer);
+    seat.graceTimer = undefined;
+  }
 }
 
 interface Room {
@@ -109,6 +122,7 @@ function hostSession(room: Room): Session | undefined {
 function closeRoom(room: Room, reason: string) {
   const msg = { type: "room_closed", roomId: room.id, reason };
   for (const seat of room.seats) {
+    clearGrace(seat);
     if (seat?.playerId) {
       const s = byPlayerId.get(seat.playerId);
       if (s && s.roomId === room.id) {
@@ -129,15 +143,46 @@ function leaveRoom(session: Session, disconnected: boolean) {
   if (!room || seatNo === undefined) return;
 
   if (seatNo === 0) {
-    closeRoom(room, disconnected ? "host_disconnected" : "host_left");
+    if (!disconnected) {
+      // Host chose to leave: the room cannot continue (the host runs the game).
+      closeRoom(room, "host_left");
+      return;
+    }
+    // Transient host drop (app backgrounded, network blip): keep the room for
+    // a grace period so the host can reclaim seat 0 by reconnecting.
+    const host = room.seats[0];
+    if (host) {
+      host.connected = false;
+      clearGrace(host);
+      host.graceTimer = setTimeout(() => {
+        const r = rooms.get(room.id);
+        if (r && r.seats[0] && !r.seats[0].connected)
+          closeRoom(r, "host_disconnected");
+      }, HOST_GRACE_MS);
+    }
+    broadcastRoom(room);
     return;
   }
   const seat = room.seats[seatNo];
   if (seat) {
-    if (room.phase === "playing") {
-      seat.connected = false;
-    } else {
+    if (!disconnected && room.phase !== "playing") {
+      // deliberate leave from an open room frees the seat right away
       room.seats[seatNo] = null;
+    } else {
+      // keep the seat reserved so the player can reclaim it; in open rooms
+      // give it up after a grace period so the room does not stay blocked
+      seat.connected = false;
+      clearGrace(seat);
+      if (room.phase !== "playing") {
+        seat.graceTimer = setTimeout(() => {
+          const r = rooms.get(room.id);
+          const s = r?.seats[seatNo];
+          if (r && s && s.kind === "human" && !s.connected) {
+            r.seats[seatNo] = null;
+            broadcastRoom(r);
+          }
+        }, GUEST_GRACE_MS);
+      }
     }
   }
   broadcastRoom(room);
@@ -163,6 +208,17 @@ function checkMsgRate(session: Session): boolean {
   return session.msgCount <= MSG_RATE_LIMIT;
 }
 
+/** Find the seat a player holds anywhere (survives session loss). */
+function findSeatByPlayer(playerId: string): { room: Room; seatNo: number } | undefined {
+  for (const room of rooms.values()) {
+    const seatNo = room.seats.findIndex(
+      (s) => s?.kind === "human" && s.playerId === playerId
+    );
+    if (seatNo >= 0) return { room, seatNo };
+  }
+  return undefined;
+}
+
 export function onDisconnect(session: Session) {
   if (session.playerId && byPlayerId.get(session.playerId) === session)
     byPlayerId.delete(session.playerId);
@@ -183,13 +239,27 @@ export function handleMessage(session: Session, msg: ClientMsg) {
     session.playerId = msg.playerId;
     session.name = msg.name;
     byPlayerId.set(msg.playerId, session);
+    // Reclaim a reserved seat even if the previous session is long gone
+    // (app backgrounded or restarted): re-bind and replay the room context.
+    if (session.roomId === undefined) {
+      const held = findSeatByPlayer(msg.playerId);
+      if (held) {
+        session.roomId = held.room.id;
+        session.seat = held.seatNo;
+      }
+    }
     const room = session.roomId ? rooms.get(session.roomId) : undefined;
+    send(session, { type: "welcome" });
     if (room && session.seat !== undefined) {
       const seat = room.seats[session.seat];
-      if (seat) seat.connected = true;
+      if (seat) {
+        seat.connected = true;
+        clearGrace(seat);
+      }
+      send(session, { type: "joined", roomId: room.id, seat: session.seat });
       broadcastRoom(room);
+      if (room.phase === "playing") send(session, { type: "started" });
     }
-    send(session, { type: "welcome" });
     return;
   }
 
@@ -272,6 +342,17 @@ export function handleMessage(session: Session, msg: ClientMsg) {
 
     case "join": {
       if (session.roomId) {
+        // idempotent when already seated in that very room (e.g. the client
+        // joined explicitly after hello already auto-reclaimed the seat)
+        if (session.roomId === msg.roomId && session.seat !== undefined) {
+          const room = rooms.get(msg.roomId);
+          if (room) {
+            send(session, { type: "joined", roomId: room.id, seat: session.seat });
+            send(session, { type: "room_state", room: publicRoom(room) });
+            if (room.phase === "playing") send(session, { type: "started" });
+            return;
+          }
+        }
         error(session, "in_room", "Already in a room");
         return;
       }
@@ -307,6 +388,7 @@ export function handleMessage(session: Session, msg: ClientMsg) {
         const seat = room.seats[seatNo]!;
         seat.connected = true;
         seat.name = session.name;
+        clearGrace(seat);
       }
       room.lastActivityAt = Date.now();
       session.roomId = room.id;
@@ -345,6 +427,7 @@ export function handleMessage(session: Session, msg: ClientMsg) {
           target.seat = undefined;
         }
       }
+      clearGrace(seat);
       room.seats[msg.seat] = null;
       room.lastActivityAt = Date.now();
       broadcastRoom(room);
@@ -377,12 +460,42 @@ export function handleMessage(session: Session, msg: ClientMsg) {
         error(session, "seat_taken", "Seat is taken");
         return;
       }
+      clearGrace(current);
       room.seats[seatNo] = {
         name: `Bot ${seatNo}`,
         kind: "bot",
         connected: true,
       };
       room.lastActivityAt = Date.now();
+      broadcastRoom(room);
+      return;
+    }
+
+    case "swap_seats": {
+      const room = session.roomId ? rooms.get(session.roomId) : undefined;
+      if (!room || session.seat !== 0) {
+        error(session, "not_host", "Only the host can do that");
+        return;
+      }
+      if (room.phase !== "open") {
+        error(session, "playing", "Game already started");
+        return;
+      }
+      if (msg.a >= room.maxSeats || msg.b >= room.maxSeats || msg.a === msg.b) {
+        error(session, "bad_seat", "No such seat");
+        return;
+      }
+      const sa = room.seats[msg.a];
+      const sb = room.seats[msg.b];
+      room.seats[msg.a] = sb;
+      room.seats[msg.b] = sa;
+      // keep the bound sessions pointing at their new seat numbers
+      for (const [seatNo, seat] of [[msg.b, sa], [msg.a, sb]] as const) {
+        if (seat?.kind === "human" && seat.playerId) {
+          const s = byPlayerId.get(seat.playerId);
+          if (s && s.roomId === room.id) s.seat = seatNo;
+        }
+      }
       broadcastRoom(room);
       return;
     }
