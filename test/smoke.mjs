@@ -93,6 +93,15 @@ check(joined.seat === 1, "alice joined seat 1");
 host.send({ type: "add_bot" });
 const withBot = await host.wait((m) => m.type === "room_state" && m.room.seats[2]?.kind === "bot");
 check(withBot.room.seats[2].kind === "bot", "bot added on seat 2");
+
+// host rearranges guests before start
+host.send({ type: "swap_seats", a: 1, b: 2 });
+const swapped = await host.wait((m) => m.type === "room_state" && m.room.seats[1]?.kind === "bot");
+check(swapped.room.seats[2]?.name === "Alice", "seats swapped by host");
+host.send({ type: "swap_seats", a: 1, b: 2 });
+await host.wait((m) => m.type === "room_state" && m.room.seats[1]?.name === "Alice");
+check(true, "seats swapped back");
+
 host.send({ type: "start" });
 await host.wait((m) => m.type === "started");
 await alice.wait((m) => m.type === "started");
@@ -110,15 +119,20 @@ check(fromHost.data.snapshot.length === 3, "host -> guest relay");
 bob.send({ type: "join", roomId, password: "secret" });
 check((await bob.wait((m) => m.type === "error")).code === "playing", "no join after start");
 
-// alice drops mid-game: seat reserved, then reclaimed without password
+// alice drops mid-game: seat reserved, hello alone reclaims it and replays
+// the room context (auto-rejoin), and explicit join stays idempotent
 alice.ws.terminate();
 await host.wait((m) => m.type === "room_state" && m.room.seats[1]?.connected === false);
 check(true, "disconnected seat kept reserved");
 const alice2 = new Client("Alice", "alice-0000-0000");
 await alice2.hello();
+const autoJoin = await alice2.wait((m) => m.type === "joined");
+check(autoJoin.seat === 1 && autoJoin.roomId === roomId, "hello auto-reclaimed the seat");
+await alice2.wait((m) => m.type === "started");
+check(true, "started replayed on reconnect");
 alice2.send({ type: "join", roomId });
 const rejoined = await alice2.wait((m) => m.type === "joined");
-check(rejoined.seat === 1, "alice reclaimed her seat");
+check(rejoined.seat === 1, "explicit join is idempotent");
 
 // kick
 host.send({ type: "kick", seat: 1 });
@@ -154,9 +168,41 @@ host.send({ type: "start" });
 await host.wait((m) => m.type === "started");
 check(true, "resumed game started");
 
-host.close();
+// transient HOST drop: the room survives the grace period and the host
+// reclaims seat 0 by reconnecting
+host.ws.terminate();
+await new Promise((r) => setTimeout(r, 300));
+bob.send({ type: "list_rooms" });
+const graceList = await bob.wait((m) => m.type === "rooms");
+check(graceList.rooms.some((r) => r.id === roomId), "room survives host drop (grace)");
+const host2 = new Client("Host", "host-0000-0000");
+await host2.hello();
+const hostBack = await host2.wait((m) => m.type === "joined");
+check(hostBack.seat === 0 && hostBack.roomId === roomId, "host auto-reclaimed seat 0");
+await host2.wait((m) => m.type === "started");
+check(true, "started replayed to reconnected host");
+
+// open-room guest drop: the seat is kept during grace and hello reclaims it
+bob.send({ type: "create_room", name: "Bob game", rules: {}, maxSeats: 3 });
+const bobRoom = (await bob.wait((m) => m.type === "room_created")).roomId;
+const carol = new Client("Carol", "carol-0000-0000");
+await carol.hello();
+carol.send({ type: "join", roomId: bobRoom });
+await carol.wait((m) => m.type === "joined");
+carol.ws.terminate();
+await bob.wait((m) => m.type === "room_state" && m.room.seats[1]?.connected === false);
+check(true, "open-room seat kept during grace");
+const carol2 = new Client("Carol", "carol-0000-0000");
+await carol2.hello();
+const carolBack = await carol2.wait((m) => m.type === "joined");
+check(carolBack.seat === 1 && carolBack.roomId === bobRoom, "guest auto-reclaimed open-room seat");
+await bob.wait((m) => m.type === "room_state" && m.room.seats[1]?.connected === true);
+check(true, "host sees the guest back online");
+
+host2.close();
 alice2.close();
 bob.close();
+carol2.close();
 
 if (failures) {
   console.error(`\n${failures} check(s) FAILED`);

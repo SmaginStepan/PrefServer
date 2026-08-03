@@ -62,6 +62,13 @@ export const addBotMsg = z.object({
 
 export const startMsg = z.object({ type: z.literal("start") });
 
+/** Host rearranges guests before the game starts (seat 0 stays the host). */
+export const swapSeatsMsg = z.object({
+  type: z.literal("swap_seats"),
+  a: seatIndex,
+  b: seatIndex,
+});
+
 /** Blind relay. Host must address a seat; guests always talk to the host. */
 export const sendMsg = z.object({
   type: z.literal("send"),
@@ -79,6 +86,7 @@ export const clientMsg = z.discriminatedUnion("type", [
   kickMsg,
   addBotMsg,
   startMsg,
+  swapSeatsMsg,
   sendMsg,
 ]);
 
