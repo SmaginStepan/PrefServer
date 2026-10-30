@@ -75,8 +75,8 @@ const PRIVACY_HTML = `<!DOCTYPE html>
      from; this log is kept for as long as it is needed for that purpose and is not shown to
      anyone. Seasons use a published seed so that every player gets the same deals; the seed
      contains no personal data.</p>
-  <p>You can ask us to delete your leaderboard entries (see Contact below). Send us the name you
-     played under.</p>
+  <p>You can ask us to delete your data at any time; see
+     <a href="#delete">Delete Your Data</a> below.</p>
 
   <h2>Advertising</h2>
   <p>The free version shows a full-screen advertisement after some finished single-player deals
@@ -99,6 +99,27 @@ const PRIVACY_HTML = `<!DOCTYPE html>
   <p>The one-time "Remove ads" purchase is processed entirely by <strong>Google Play</strong>. We
      never see your payment details. The app only asks Google Play whether you own the product and
      remembers the result on your device so ads stay off.</p>
+
+  <h2 id="delete">Delete Your Data</h2>
+  <p>This applies to the <strong>Preferans Master</strong> app by aN0obIs. To request deletion of
+     the data we hold about you:</p>
+  <ol>
+    <li>Email <a href="mailto:smagines@gmail.com?subject=Preferans%20Master%20data%20deletion">smagines@gmail.com</a>
+        with the subject "Preferans Master data deletion".</li>
+    <li>Tell us the <strong>display name</strong> you played under and, if you can, roughly when you
+        played (and your Player ID if you know it).</li>
+    <li>We delete the request within 30 days, normally within a few business days, and reply when
+        it is done.</li>
+  </ol>
+  <p><strong>What is deleted:</strong> your leaderboard and season entries (display name, score,
+     Player ID) and the submission log records linked to them, including the IP address.</p>
+  <p><strong>What is not held by us:</strong> multiplayer room data exists only in memory and
+     disappears on its own (see Multiplayer above). Saved games, statistics and settings live only
+     on your device and are removed when you clear the app's data or uninstall it. Data processed
+     by Google (AdMob, Google Play) is controlled through your Google account and Android settings
+     (see Advertising above).</p>
+  <p><strong>What may remain:</strong> nothing that identifies you. Once your entries are removed,
+     only anonymous totals (for example the number of players in a season) may remain.</p>
 
   <h2>What We Do Not Collect</h2>
   <ul>
