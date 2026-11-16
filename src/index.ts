@@ -159,7 +159,7 @@ const BRIDGE_PRIVACY_HTML = `<!DOCTYPE html>
            max-width: 680px; margin: 48px auto; padding: 0 24px; color: #1a1a1a; line-height: 1.7; }
     h1 { font-size: 1.8rem; }
     h2 { font-size: 1.1rem; margin-top: 2em; }
-    p, ul { color: #333; }
+    p, ul, ol { color: #333; }
     a { color: #007aff; }
     .meta { color: #888; font-size: 0.875rem; }
   </style>
@@ -168,67 +168,102 @@ const BRIDGE_PRIVACY_HTML = `<!DOCTYPE html>
   <h1>Privacy Policy – Bridge Master</h1>
   <p class="meta">Last updated: November 2026</p>
 
-  <p>This policy covers the <strong>Bridge Master</strong> app for Android by aN0obIs ("the app").
-     The game is played offline on your device. This version of the app has no accounts, has no
-     analytics of its own, and does not send any data to servers operated by us.</p>
+  <p>This policy covers the <strong>Bridge Master</strong> app for Android by aN0obIs ("the app")
+     and the leaderboard service it can connect to at <code>scores.preferansmaster.com</code>.
+     The game itself is played offline on your device. The leaderboard is optional and is off
+     until you agree to it.</p>
 
   <h2>Stored on Your Device Only</h2>
   <ul>
     <li>Your current session, the results of finished boards and your settings.</li>
-    <li>A counter of finished boards, whether you have rated the app, and whether you have removed
-        ads. These are never sent to us.</li>
+    <li>A counter of finished boards, whether you have rated the app, whether you have removed
+        ads, and your leaderboard choice. These are never sent to us.</li>
   </ul>
   <p>This data is deleted when you clear the app's data or uninstall the app.</p>
 
+  <h2>Top Players List (Optional)</h2>
+  <p>After you finish your first 16-board session, the app asks whether you want to appear on the
+     worldwide "Top players" list. If you say no, nothing is sent. If you say yes, then after each
+     finished session the app sends the following to the leaderboard service so that rankings can
+     be shown:</p>
+  <ul>
+    <li>a random <strong>Player ID</strong> generated on your device (not linked to your identity,
+        email or any account);</li>
+    <li>the <strong>display name</strong> you typed;</li>
+    <li>your <strong>session score</strong> (average matchpoint percentage) and the time it was
+        achieved on the device.</li>
+  </ul>
+  <p>Your display name and score are shown to other players on the list. To detect cheating, the
+     service also records the time of every submission and the <strong>IP address</strong> it came
+     from; the IP address is deleted after 90 days and is never shown to anyone. You can turn the
+     list off at any time under "Top players" in the app; nothing more is sent after that. To
+     remove what was already sent, see <a href="#delete">Delete Your Data</a> below. All
+     connections to the service use HTTPS, and submissions are signed.</p>
+  <p>The service is operated by us, on our own server. We do not share this data with anyone else.</p>
+
   <h2>Advertising</h2>
-  <p>The free version may show advertisements. Ads are provided by <strong>Google AdMob</strong>.
-     To show and measure ads, Google may collect and process your device's <strong>advertising
-     ID</strong>, IP address, approximate location derived from the IP address, and information
-     about the device and about how you interact with ads. We do not receive this data and do not
-     use it ourselves. Versions of the app used for testing may have ads switched off; in that case
-     no advertising data is collected.</p>
+  <p>The free version shows a full-screen advertisement after some finished boards (never during
+     the first boards, and never in the middle of a hand). Ads are provided by
+     <strong>Google AdMob</strong>. To show and measure ads, Google may collect and process your
+     device's <strong>advertising ID</strong>, IP address, approximate location derived from the IP
+     address, diagnostics and crash information, and information about how you interact with ads.
+     We do not receive this data and do not use it ourselves.</p>
   <ul>
     <li>If you are in the European Economic Area, the United Kingdom or another region that requires
         it, the app first shows a consent form (Google's User Messaging Platform). You can change
-        your choice later through the app's privacy options where offered, or by resetting or
-        deleting your advertising ID in Android Settings.</li>
+        your choice later through "Privacy settings" in the app menu, or by resetting or deleting
+        your advertising ID in Android Settings.</li>
     <li>You can turn off ad personalisation in Android Settings → Google → Ads.</li>
     <li>More about how Google uses data from apps that use its services:
         <a href="https://policies.google.com/technologies/partner-sites">policies.google.com/technologies/partner-sites</a>.</li>
   </ul>
 
   <h2>Removing Ads (In-App Purchase)</h2>
-  <p>If the app offers the one-time "Remove ads" purchase, it is processed entirely by
-     <strong>Google Play</strong>. We never see your payment details. The app only asks Google Play
-     whether you own the product and remembers the result on your device so ads stay off.</p>
+  <p>The one-time "Remove ads" purchase is processed entirely by <strong>Google Play</strong>. We
+     never see your payment details. The app only asks Google Play whether you own the product and
+     remembers the result on your device so ads stay off.</p>
+
+  <h2 id="delete">Delete Your Data</h2>
+  <p>This applies to the <strong>Bridge Master</strong> app by aN0obIs. To request deletion of the
+     data we hold about you:</p>
+  <ol>
+    <li>Email <a href="mailto:smagines@gmail.com?subject=Bridge%20Master%20data%20deletion">smagines@gmail.com</a>
+        with the subject "Bridge Master data deletion".</li>
+    <li>Tell us the <strong>display name</strong> you used on the list and, if you can, roughly when
+        you played (and your Player ID if you know it).</li>
+    <li>We delete it within 30 days, normally within a few business days, and reply when it is
+        done.</li>
+  </ol>
+  <p><strong>What is deleted:</strong> your entries on the list (display name, score, Player ID) and
+     the submission log records linked to them, including the IP address.</p>
+  <p><strong>What we do not hold:</strong> your sessions, results, settings and statistics live only
+     on your device and are removed when you clear the app's data or uninstall it. Data processed by
+     Google (AdMob, Google Play) is controlled through your Google account and Android settings (see
+     Advertising above).</p>
 
   <h2>What We Do Not Collect</h2>
   <ul>
-    <li>No email addresses, accounts, names or passwords.</li>
+    <li>No email addresses, accounts or passwords.</li>
     <li>No contacts, photos, files or precise location.</li>
     <li>No analytics or behavioural-tracking SDK of our own. The only third-party SDKs that process
         data are Google AdMob (ads) and Google Play Billing (purchases), described above.</li>
   </ul>
 
   <h2>Future Features</h2>
-  <p>If a later version adds features that connect to a server (for example leaderboards, seasons or
-     online games), we will update this policy before they are released and describe what is sent.</p>
-
-  <h2>Your Data and Your Rights</h2>
-  <p>We do not hold personal data about you, so there is nothing for us to access, correct or delete.
-     Data stored by the app lives only on your device. Data processed by Google (AdMob, Google Play)
-     is controlled through your Google account and Android settings (see Advertising above). If you
-     have a question about your privacy, write to the address below.</p>
+  <p>If a later version adds other features that connect to a server (for example monthly seasons
+     or online games), we will update this policy before they are released and describe what is
+     sent.</p>
 
   <h2>Children</h2>
   <p>The app is not directed at children under 13, and we do not knowingly collect personal
-     information from them.</p>
+     information from them. The only personal data we process is a device-generated random ID and a
+     freely chosen display name, and only if you join the Top players list.</p>
 
   <h2>Changes</h2>
   <p>If we change how data is handled, we will update this page and its "Last updated" date.</p>
 
   <h2>Contact &amp; Support</h2>
-  <p>Questions, bug reports, or support:<br>
+  <p>Questions, deletion requests, bug reports, or support:<br>
      <a href="mailto:smagines@gmail.com">smagines@gmail.com</a></p>
 </body>
 </html>`;
