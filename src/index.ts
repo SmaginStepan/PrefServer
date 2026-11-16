@@ -147,6 +147,92 @@ const PRIVACY_HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
+// Privacy policy of the Bridge Master app (same source as BridgeAndroid/store/privacy-policy.html).
+const BRIDGE_PRIVACY_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy – Bridge Master</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+           max-width: 680px; margin: 48px auto; padding: 0 24px; color: #1a1a1a; line-height: 1.7; }
+    h1 { font-size: 1.8rem; }
+    h2 { font-size: 1.1rem; margin-top: 2em; }
+    p, ul { color: #333; }
+    a { color: #007aff; }
+    .meta { color: #888; font-size: 0.875rem; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy – Bridge Master</h1>
+  <p class="meta">Last updated: November 2026</p>
+
+  <p>This policy covers the <strong>Bridge Master</strong> app for Android by aN0obIs ("the app").
+     The game is played offline on your device. This version of the app has no accounts, has no
+     analytics of its own, and does not send any data to servers operated by us.</p>
+
+  <h2>Stored on Your Device Only</h2>
+  <ul>
+    <li>Your current session, the results of finished boards and your settings.</li>
+    <li>A counter of finished boards, whether you have rated the app, and whether you have removed
+        ads. These are never sent to us.</li>
+  </ul>
+  <p>This data is deleted when you clear the app's data or uninstall the app.</p>
+
+  <h2>Advertising</h2>
+  <p>The free version may show advertisements. Ads are provided by <strong>Google AdMob</strong>.
+     To show and measure ads, Google may collect and process your device's <strong>advertising
+     ID</strong>, IP address, approximate location derived from the IP address, and information
+     about the device and about how you interact with ads. We do not receive this data and do not
+     use it ourselves. Versions of the app used for testing may have ads switched off; in that case
+     no advertising data is collected.</p>
+  <ul>
+    <li>If you are in the European Economic Area, the United Kingdom or another region that requires
+        it, the app first shows a consent form (Google's User Messaging Platform). You can change
+        your choice later through the app's privacy options where offered, or by resetting or
+        deleting your advertising ID in Android Settings.</li>
+    <li>You can turn off ad personalisation in Android Settings → Google → Ads.</li>
+    <li>More about how Google uses data from apps that use its services:
+        <a href="https://policies.google.com/technologies/partner-sites">policies.google.com/technologies/partner-sites</a>.</li>
+  </ul>
+
+  <h2>Removing Ads (In-App Purchase)</h2>
+  <p>If the app offers the one-time "Remove ads" purchase, it is processed entirely by
+     <strong>Google Play</strong>. We never see your payment details. The app only asks Google Play
+     whether you own the product and remembers the result on your device so ads stay off.</p>
+
+  <h2>What We Do Not Collect</h2>
+  <ul>
+    <li>No email addresses, accounts, names or passwords.</li>
+    <li>No contacts, photos, files or precise location.</li>
+    <li>No analytics or behavioural-tracking SDK of our own. The only third-party SDKs that process
+        data are Google AdMob (ads) and Google Play Billing (purchases), described above.</li>
+  </ul>
+
+  <h2>Future Features</h2>
+  <p>If a later version adds features that connect to a server (for example leaderboards, seasons or
+     online games), we will update this policy before they are released and describe what is sent.</p>
+
+  <h2>Your Data and Your Rights</h2>
+  <p>We do not hold personal data about you, so there is nothing for us to access, correct or delete.
+     Data stored by the app lives only on your device. Data processed by Google (AdMob, Google Play)
+     is controlled through your Google account and Android settings (see Advertising above). If you
+     have a question about your privacy, write to the address below.</p>
+
+  <h2>Children</h2>
+  <p>The app is not directed at children under 13, and we do not knowingly collect personal
+     information from them.</p>
+
+  <h2>Changes</h2>
+  <p>If we change how data is handled, we will update this page and its "Last updated" date.</p>
+
+  <h2>Contact &amp; Support</h2>
+  <p>Questions, bug reports, or support:<br>
+     <a href="mailto:smagines@gmail.com">smagines@gmail.com</a></p>
+</body>
+</html>`;
+
 const SUPPORT_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -186,6 +272,11 @@ app.get("/health", (_req, res) => {
 app.get("/privacy", (_req, res) => {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(PRIVACY_HTML);
+});
+
+app.get("/bridge/privacy", (_req, res) => {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(BRIDGE_PRIVACY_HTML);
 });
 
 app.get("/support", (_req, res) => {
