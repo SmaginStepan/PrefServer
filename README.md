@@ -1,7 +1,8 @@
 # Preferans Master — Relay Server
 
 Real-time lobby and relay server for the Preferans card game
-([PrefAndroid](https://github.com/SmaginStepan/PrefAndroid)).  
+([PrefAndroid](https://github.com/SmaginStepan/PrefAndroid)) and Bridge Master
+([BridgeAndroid](https://github.com/SmaginStepan/BridgeAndroid)).  
 Live: `wss://preferansmaster.com/ws`
 
 The server knows nothing about Preferans. The **host device runs the game engine**; the
@@ -72,7 +73,7 @@ Exceeded limits return `{"type":"error","code":"rate_limited","message":"..."}`.
 All messages are JSON objects. Clients send:
 
 ```
-hello        { playerId, name }
+hello        { playerId, name, game? }   ← game: "pref" (default) or "bridge"
 list_rooms   {}
 create_room  { name, rules, maxSeats, password? }
 reopen_room  { roomId, name, rules, maxSeats, password?, seats[] }
@@ -102,6 +103,10 @@ error        { code, message }
 ```
 
 `rules` and `data` are opaque — the server passes them through unchanged.
+
+Rooms belong to the game named in `hello` (missing = `"pref"`, so older Preferans clients are
+unchanged): `list_rooms`, `join` and seat reclaiming only see rooms of the same game. Bridge Master
+uses `game: "bridge"` with 4-seat rooms.
 
 ---
 
@@ -162,4 +167,4 @@ npm run smoke                                        # local (ws://127.0.0.1:809
 npm run smoke -- wss://preferansmaster.com/ws       # production
 ```
 
-All 17 checks must pass.
+All 30 checks must pass.

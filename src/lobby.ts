@@ -7,6 +7,8 @@ export interface Session {
   alive: boolean;
   playerId?: string;
   name?: string;
+  /** the app this connection belongs to (from hello; default "pref") */
+  game: string;
   roomId?: string;
   seat?: number;
   // Rate limiting
@@ -37,6 +39,8 @@ function clearGrace(seat: Seat | null | undefined) {
 
 interface Room {
   id: string;
+  /** rooms of one game are invisible to the others (Preferans vs Bridge) */
+  game: string;
   name: string;
   rules: unknown;
   maxSeats: 3 | 4;
@@ -208,9 +212,10 @@ function checkMsgRate(session: Session): boolean {
   return session.msgCount <= MSG_RATE_LIMIT;
 }
 
-/** Find the seat a player holds anywhere (survives session loss). */
-function findSeatByPlayer(playerId: string): { room: Room; seatNo: number } | undefined {
+/** Find the seat a player holds in one game (survives session loss). */
+function findSeatByPlayer(playerId: string, game: string): { room: Room; seatNo: number } | undefined {
   for (const room of rooms.values()) {
+    if (room.game !== game) continue;
     const seatNo = room.seats.findIndex(
       (s) => s?.kind === "human" && s.playerId === playerId
     );
@@ -238,11 +243,12 @@ export function handleMessage(session: Session, msg: ClientMsg) {
     }
     session.playerId = msg.playerId;
     session.name = msg.name;
+    session.game = msg.game ?? "pref";
     byPlayerId.set(msg.playerId, session);
     // Reclaim a reserved seat even if the previous session is long gone
     // (app backgrounded or restarted): re-bind and replay the room context.
     if (session.roomId === undefined) {
-      const held = findSeatByPlayer(msg.playerId);
+      const held = findSeatByPlayer(msg.playerId, session.game);
       if (held) {
         session.roomId = held.room.id;
         session.seat = held.seatNo;
@@ -272,7 +278,7 @@ export function handleMessage(session: Session, msg: ClientMsg) {
     case "list_rooms": {
       send(session, {
         type: "rooms",
-        rooms: [...rooms.values()].map(publicRoom),
+        rooms: [...rooms.values()].filter((r) => r.game === session.game).map(publicRoom),
       });
       return;
     }
@@ -323,6 +329,7 @@ export function handleMessage(session: Session, msg: ClientMsg) {
       const now = Date.now();
       const room: Room = {
         id,
+        game: session.game,
         name: msg.name,
         rules: msg.rules,
         maxSeats: msg.maxSeats,
@@ -357,7 +364,7 @@ export function handleMessage(session: Session, msg: ClientMsg) {
         return;
       }
       const room = rooms.get(msg.roomId);
-      if (!room) {
+      if (!room || room.game !== session.game) {
         error(session, "no_room", "Room not found");
         return;
       }

@@ -328,6 +328,7 @@ wss.on("connection", (ws) => {
   const session: Session = {
     ws,
     alive: true,
+    game: "pref",
     roomCreations: [],
     msgCount: 0,
     msgWindowStart: Date.now(),

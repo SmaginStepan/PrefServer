@@ -8,10 +8,14 @@ const playerId = z.string().min(8).max(64);
 const displayName = z.string().min(1).max(24);
 const seatIndex = z.number().int().min(1).max(3);
 
+/** Which app is talking; rooms are only visible within one game. Missing = "pref". */
+const gameId = z.string().regex(/^[a-z]{2,16}$/);
+
 export const helloMsg = z.object({
   type: z.literal("hello"),
   playerId,
   name: displayName,
+  game: gameId.optional(),
 });
 
 export const listRoomsMsg = z.object({ type: z.literal("list_rooms") });

@@ -50,9 +50,9 @@ class Client {
       });
     });
   }
-  async hello() {
+  async hello(game) {
     await this.connect();
-    this.send({ type: "hello", playerId: this.playerId, name: this.name });
+    this.send({ type: "hello", playerId: this.playerId, name: this.name, ...(game ? { game } : {}) });
     await this.wait((m) => m.type === "welcome");
   }
   close() {
@@ -81,6 +81,21 @@ alice.send({ type: "list_rooms" });
 const rooms = await alice.wait((m) => m.type === "rooms");
 const listed = rooms.rooms.find((r) => r.id === roomId);
 check(!!listed && listed.hasPassword && listed.rules.gameType === "Sochy", "room listed with rules + password flag");
+
+// a Bridge client neither sees nor joins a Preferans room, and its own rooms stay apart
+const bri = new Client("Bri", "bri-0000-0000-bridge");
+await bri.hello("bridge");
+bri.send({ type: "list_rooms" });
+check(!(await bri.wait((m) => m.type === "rooms")).rooms.some((r) => r.id === roomId), "bridge lobby hides preferans rooms");
+bri.send({ type: "join", roomId, password: "secret" });
+check((await bri.wait((m) => m.type === "error")).code === "no_room", "bridge client cannot join a preferans room");
+bri.send({ type: "create_room", name: "Bridge table", rules: { game: "bridge" }, maxSeats: 4 });
+const briRoom = (await bri.wait((m) => m.type === "room_created")).roomId;
+alice.send({ type: "list_rooms" });
+check(!(await alice.wait((m) => m.type === "rooms")).rooms.some((r) => r.id === briRoom), "preferans lobby hides bridge rooms");
+bri.send({ type: "leave" });
+await bri.wait((m) => m.type === "left");
+bri.close();
 
 // wrong password rejected, right password seats Alice
 alice.send({ type: "join", roomId, password: "nope" });
